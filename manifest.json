@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "yt-dlp downloader",
+  "version": "2.1",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAniC4fLlGGKoIo7bKLRspaN8DFBxwTnoVIFPYqrVLf/1FbCTwEO5jPeI5mECXc6H/wENhGfRQ4wPBwDHN2aBLHTBdHcELe16EmwNuT5mT4cYh8jggA+tD6X4nybVT/Btzstv/mcYfHHMTfTfD0xL5rnQFp4t4RaeTu7/EkH8W4VkF6qECJdZIUF2g+/icGZPrnlXGrbmq66ypqFFljb9+xcn2mPJSRl2tsgCVaBZTE6tIoBeNumsukcx0KYI0jIPLd+3Cthn03OdXp9rZXs5r5HKxTqVrBM63C+9bv4Jma1BxQdirZG/5w7wZre1MyN/rmMhmj92/xZ2Qy+5A7ig9xwIDAQAB",
+  "description": "Download the current YouTube video or its audio with yt-dlp.",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "nativeMessaging",
+    "cookies"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://www.youtube.com/*"
+      ],
+      "js": [
+        "panel.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "host_permissions": [
+    "*://*.youtube.com/*",
+    "*://*.google.com/*"
+  ]
+}
