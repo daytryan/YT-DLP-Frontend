@@ -88,19 +88,22 @@ const tickSrc = grab(/function tick\(\)[\s\S]*?\n}/);
 
 // Stubs stand in for everything tick() leans on. `measured` counts the calls that force a
 // layout, `reseats` the times it pulled the button to try a better seat.
-function drive(ticks, { hidden = false, wrap = false } = {}) {
+// `group` is the new layout's like group: present, the first seat is outside it (the load race)
+function drive(ticks, { hidden = false, wrap = false, group = null } = {}) {
   const c = { measured: 0, reseats: 0 };
   // hasAttribute reports the stand-in flag, so the give-up path has somewhere to settle
   const btn = { isConnected: true, loose: false, hasAttribute() { return this.loose },
                 remove() { c.reseats++; this.isConnected = false } };
   const env = {
-    document: { hidden, fullscreenElement: null, getElementById: () => btn },
+    document: { hidden, fullscreenElement: null, getElementById: () => btn,
+                querySelector: () => group },
+    FIXED_GROUP: "",
     location: { href: "u", pathname: "/watch" },
     wrapped: () => (c.measured++, wrap),
     findRow: () => (c.measured++, true),
     visible: () => true, metaBlock: () => ({}), place() {}, closePanel() {}, watchRow() {},
     // a fresh button, the way the real one re-seats; `loose` is inject()'s stand-in path
-    inject: loose => (btn.loose = !!loose, btn.isConnected = true),
+    inject: loose => (btn.loose = !!loose, btn.parentElement = group, btn.isConnected = true),
   };
   const tick = new Function(...Object.keys(env), `
     let misses = 0, fixes = 0, panel = null, href = "u";
@@ -124,6 +127,9 @@ assert.equal(drive(120, { wrap: true }).loose, true, "it must never come to rest
 assert.equal(drive(120).loose, false, "a row that suits us is not traded for the stand-in");
 // ...and once there it stops pulling the button around rather than flickering forever.
 assert.equal(drive(120, { wrap: true }).reseats, 4, "the stand-in is an end state, not a loop");
+
+// New layout: a first seat outside the like group moves into it once, then stays put.
+assert.equal(drive(60, { group: {} }).reseats, 1, "move into the like group once, not forever");
 
 console.log("ok - placement re-checked every tick, and never at rest wrapped");
 

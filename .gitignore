@@ -1,0 +1,10 @@
+# private signing key: it fixes the extension ID, never publish it
+extension-key.pem
+# written by install.py with this machine's paths
+host.bat
+com.ytdlp.bridge.json
+# build output
+youtube-downloader-share/
+youtube-downloader-share.zip
+__pycache__/
+.impeccable/

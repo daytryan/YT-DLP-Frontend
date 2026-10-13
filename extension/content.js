@@ -80,7 +80,8 @@ addEventListener("resize", () => {
   place();
   clearTimeout(resized);
   resized = setTimeout(() => {
-    document.getElementById("ytdlp-btn")?.remove();
+    // in the like group YouTube refits the row itself; pulling us out would only flash Share back
+    if (!document.querySelector(`${FIXED_GROUP} > #ytdlp-btn`)) document.getElementById("ytdlp-btn")?.remove();
     misses = fixes = 0;  // the layout moved, so allow re-seating against the new one
   }, 250);
 });
@@ -131,6 +132,14 @@ function discoverRow() {
 }
 
 const findRow = () => NAMED_ROWS.map(s => document.querySelector(s)).find(isRow) || discoverRow();
+
+// The 2026 layout keeps only like/dislike in #top-level-buttons-computed and moves Share, Ask
+// and Save into #flexible-item-buttons, which YouTube empties into the ⋯ menu until the row fits.
+// Its fit sum counts the like group but not strangers: seated anywhere else in the menu we made
+// it hide every one of them, or overflow. Inside the like group we count, so YouTube folds away
+// exactly as many as we displace, on every resize, with no help from us.
+const FIXED_GROUP = "ytd-watch-metadata ytd-menu-renderer:has(> #flexible-item-buttons) > #top-level-buttons-computed";
+let tmpl;  // last good clone: once we are seated, Share may be folded away and there is no donor
 
 // the row's own child that holds `el`, so we insert between siblings rather than inside a widget
 function rowChild(row, el) {
@@ -243,7 +252,8 @@ function shownGap(row) {
 }
 
 function inject(loose) {
-  const row = loose ? null : findRow();
+  const fixed = loose ? null : document.querySelector(FIXED_GROUP);
+  const row = loose ? null : visible(fixed) ? fixed.parentElement : findRow();
   // No row, or none we can sit in cleanly after LOOSE tries: a plain button above the title
   // reads as deliberate, which a full-width one wedged under Share never does.
   if (!row || misses >= LOOSE) {
@@ -255,7 +265,8 @@ function inject(loose) {
     meta.prepend(loose);
     return true;
   }
-  const donor = pickDonor(row);
+  // in the new layout only a flexible item will do: the other pill there is the round ⋯ button
+  const donor = fixed ? pickDonor(row.querySelector("#flexible-item-buttons")) : pickDonor(row);
   // The row element usually exists before YouTube fills it in. Injecting into an empty one
   // strands us at the end of a half-built row, so wait for a donor instead of taking a bad seat.
   if (!donor && misses < SETTLE) return false;
@@ -263,20 +274,24 @@ function inject(loose) {
   // between measures as our own width instead. See shownGap().
   const gap = shownGap(row);
   const donorText = donor ? labelOf(donor) : "";
-  let btn = wire(donor ? cloneButton(donor) : plainButton());
-  const seat = donor && rowChild(row, donor);
-  if (seat) seat.after(btn); else row.appendChild(btn);  // after() returns undefined: no ?? here
+  let btn = wire(donor ? cloneButton(donor) : tmpl ? tmpl.cloneNode(true) : plainButton());
+  const seat = !fixed && donor && rowChild(row, donor);
+  if (fixed) fixed.appendChild(btn);
+  else if (seat) seat.after(btn); else row.appendChild(btn);  // after() returns undefined: no ?? here
   // Trust but verify: never leave a collapsed button, or one still reading "Share"
   if (btn.offsetHeight < 16 || btn.offsetWidth < 16 ||
       (donorText && btn.textContent.trim() === donorText)) {
     const plain = wire(plainButton());
     btn.replaceWith(plain);
     btn = plain;
+  } else if (donor) {
+    tmpl = btn.cloneNode(true);
   }
   // Spacing goes on last, so the stand-in swapped in above gets it too rather than falling back
   // to .ytdlp-btn's guess. What lands between us and the seat is the seat's own margin-right
   // plus ours, so subtract theirs off the target instead of double-counting it.
-  if (seat) {
+  if (fixed) btn.style.marginLeft = `${gap}px`;
+  else if (seat) {
     const mr = parseFloat(getComputedStyle(seat).marginRight) || 0;
     btn.style.marginLeft = `${Math.max(0, gap - mr)}px`;
     btn.style.marginRight = `${mr}px`;
@@ -321,7 +336,11 @@ function tick() {
     // is genuinely too narrow settles instead of flickering, and an open panel is never yanked
     // out from under the user.
     const loose = placed.hasAttribute("data-ytdlp-loose");
-    const redo = loose ? !!findRow() : wrapped(placed);
+    // On load YouTube fills the like group before #flexible-item-buttons exists, so our first
+    // seat is often the old-layout one; move into the like group once it is recognisable.
+    const fixed = document.querySelector(FIXED_GROUP);
+    const redo = loose ? !!findRow()
+      : wrapped(placed) || (visible(fixed) && placed.parentElement !== fixed);
     // A settled seat is as done as a clean one; an open panel blocking a needed re-seat is not.
     // Settled only ever means the stand-in, though: a wrapped button is never one we live with.
     if (panel || !redo || (loose && fixes >= FIXES)) return place();
